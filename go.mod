@@ -1,4 +1,4 @@
-module github.com/fagongzi/goetty/v2
+module github.com/matrixorigin/goetty/v2
 
 go 1.18
 
