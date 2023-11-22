@@ -64,6 +64,16 @@ func WithAppTLS(tlsCfg *tls.Config) AppOption {
 	}
 }
 
+// WithReadTimeout set read timeout for
+func WithReadTimeout(timeout time.Duration) AppOption {
+	return func(s *server) {
+		if timeout < 0 {
+			timeout = 0
+		}
+		s.options.readTimeout.Timeout = timeout
+	}
+}
+
 // WithAppTLSFromKeys set tls config from cert and key files for application
 func WithAppTLSFromCertAndKey(
 	certFile string,
@@ -135,6 +145,8 @@ type server struct {
 		sessionBucketSize uint64
 		aware             IOSessionAware
 		handleSessionFunc func(IOSession) error
+		// doConnection waits the message from client until readTimeout expires.
+		readTimeout ReadOptions
 	}
 }
 
@@ -362,7 +374,7 @@ func (s *server) doConnection(rs IOSession) error {
 
 	received := uint64(0)
 	for {
-		msg, err := rs.Read(ReadOptions{})
+		msg, err := rs.Read(s.options.readTimeout)
 		if err != nil {
 			if err == io.EOF {
 				return nil
