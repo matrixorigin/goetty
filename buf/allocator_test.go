@@ -8,5 +8,7 @@ import (
 
 func TestAlloc(t *testing.T) {
 	alloc := newNonReusableAllocator()
-	assert.Equal(t, 10, len(alloc.Alloc(10)))
+	buf, err := alloc.Alloc(10)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, len(buf))
 }

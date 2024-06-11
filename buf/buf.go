@@ -91,6 +91,7 @@ type ByteBuf struct {
 
 // NewByteBuf create bytebuf with options
 func NewByteBuf(capacity int, opts ...Option) *ByteBuf {
+	var err error
 	b := &ByteBuf{
 		readerIndex: 0,
 		writerIndex: 0,
@@ -99,7 +100,10 @@ func NewByteBuf(capacity int, opts ...Option) *ByteBuf {
 		opt(b)
 	}
 	b.adjust()
-	b.buf = b.options.alloc.Alloc(capacity)
+	b.buf, err = b.options.alloc.Alloc(capacity)
+	if err != nil {
+		panic(fmt.Sprintf("allocate buffer failed. err:%v", err))
+	}
 	return b
 }
 
@@ -369,43 +373,66 @@ func (b *ByteBuf) MustWrite(value []byte) {
 }
 
 // WriteUint16 write uint16 into buf
-func (b *ByteBuf) WriteUint16(v uint16) {
-	b.Grow(2)
+func (b *ByteBuf) WriteUint16(v uint16) error {
+	err := b.Grow(2)
+	if err != nil {
+		return err
+	}
 	Uint16ToBytesTo(v, b.buf[b.writerIndex:b.writerIndex+2])
 	b.writerIndex += 2
+	return nil
 }
 
 // WriteInt write int into buf
-func (b *ByteBuf) WriteInt(v int) {
-	b.Grow(4)
+func (b *ByteBuf) WriteInt(v int) error {
+	err := b.Grow(4)
+	if err != nil {
+		return err
+	}
 	Int2BytesTo(v, b.buf[b.writerIndex:b.writerIndex+4])
 	b.writerIndex += 4
+	return nil
 }
 
 // WriteUint32 write uint32 into buf
-func (b *ByteBuf) WriteUint32(v uint32) {
-	b.Grow(4)
+func (b *ByteBuf) WriteUint32(v uint32) error {
+	err := b.Grow(4)
+	if err != nil {
+		return err
+	}
 	Uint32ToBytesTo(v, b.buf[b.writerIndex:b.writerIndex+4])
 	b.writerIndex += 4
+	return nil
 }
 
 // WriteInt64 write int64 into buf
-func (b *ByteBuf) WriteInt64(v int64) {
-	b.Grow(8)
+func (b *ByteBuf) WriteInt64(v int64) error {
+	err := b.Grow(8)
+	if err != nil {
+		return err
+	}
 	Int64ToBytesTo(v, b.buf[b.writerIndex:b.writerIndex+8])
 	b.writerIndex += 8
+	return nil
 }
 
 // WriteUint64 write uint64 into buf
-func (b *ByteBuf) WriteUint64(v uint64) {
-	b.Grow(8)
+func (b *ByteBuf) WriteUint64(v uint64) error {
+	err := b.Grow(8)
+	if err != nil {
+		return err
+	}
 	Uint64ToBytesTo(v, b.buf[b.writerIndex:b.writerIndex+8])
 	b.writerIndex += 8
+	return nil
 }
 
 // WriteByte write a byte value into buf.
 func (b *ByteBuf) WriteByte(v byte) error {
-	b.Grow(1)
+	err := b.Grow(1)
+	if err != nil {
+		return err
+	}
 	b.buf[b.writerIndex] = v
 	b.writerIndex++
 	return nil
@@ -419,12 +446,16 @@ func (b *ByteBuf) MustWriteByte(v byte) {
 }
 
 // WriteString write a string value to buf
-func (b *ByteBuf) WriteString(v string) {
-	b.Write(hack.StringToSlice(v))
+func (b *ByteBuf) WriteString(v string) error {
+	_, err := b.Write(hack.StringToSlice(v))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Grow grow buf size
-func (b *ByteBuf) Grow(n int) {
+func (b *ByteBuf) Grow(n int) error {
 	if free := b.Writeable(); free < n {
 		current := b.capacity()
 
@@ -447,7 +478,10 @@ func (b *ByteBuf) Grow(n int) {
 			target += step
 		}
 
-		newBuf := b.options.alloc.Alloc(target)
+		newBuf, err := b.options.alloc.Alloc(target)
+		if err != nil {
+			return err
+		}
 		if b.options.disableCompactAfterGrow {
 			copy(newBuf, b.buf)
 		} else {
@@ -460,12 +494,16 @@ func (b *ByteBuf) Grow(n int) {
 		b.options.alloc.Free(b.buf)
 		b.buf = newBuf
 	}
+	return nil
 }
 
 // Write implemented io.Writer interface
 func (b *ByteBuf) Write(src []byte) (int, error) {
 	n := len(src)
-	b.Grow(n)
+	err := b.Grow(n)
+	if err != nil {
+		return 0, err
+	}
 	copy(b.buf[b.writerIndex:], src)
 	b.writerIndex += n
 	return n, nil
@@ -504,7 +542,10 @@ func (b *ByteBuf) Read(dst []byte) (int, error) {
 // ReadFrom implemented io.ReaderFrom interface
 func (b *ByteBuf) ReadFrom(r io.Reader) (n int64, err error) {
 	for {
-		b.Grow(b.options.ioCopyBufferSize)
+		err = b.Grow(b.options.ioCopyBufferSize)
+		if err != nil {
+			return 0, err
+		}
 		m, e := r.Read(b.buf[b.writerIndex : b.writerIndex+b.options.ioCopyBufferSize])
 		if m < 0 {
 			panic("bug: negative Read")
