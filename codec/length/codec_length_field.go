@@ -72,16 +72,22 @@ func (c *lengthCodec) Decode(in *buf.ByteBuf) (any, bool, error) {
 
 func (c *lengthCodec) Encode(message any, out *buf.ByteBuf, conn io.Writer) error {
 	oldIndexOffset := out.Readable()
-	out.Grow(4)
+	err := out.Grow(4)
+	if err != nil {
+		return err
+	}
 	out.SetWriteIndex(out.GetReadIndex() + oldIndexOffset + 4)
-	err := c.baseCodec.Encode(message, out, conn)
+	err = c.baseCodec.Encode(message, out, conn)
 	if err != nil {
 		return err
 	}
 	newIndex := out.GetWriteIndex()
 	oldIndex := out.GetReadIndex() + oldIndexOffset
 	out.SetWriteIndex(oldIndex)
-	out.WriteInt(newIndex - oldIndex - 4)
+	err = out.WriteInt(newIndex - oldIndex - 4)
+	if err != nil {
+		return err
+	}
 	out.SetWriteIndex(newIndex)
 	return nil
 }
